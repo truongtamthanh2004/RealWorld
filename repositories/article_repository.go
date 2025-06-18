@@ -6,12 +6,12 @@ import (
 )
 
 type ArticleRepository interface {
-	//Create(article *models.Article) error
-	//FindBySlug(slug string) (*models.Article, error)
-	//Update(article *models.Article) error
-	//Delete(article *models.Article) error
+	Create(article *models.Article) error
+	FindBySlug(slug string) (*models.Article, error)
+	Update(article *models.Article) error
+	DeleteByID(articleID uint) error
 	List(tag, author, favorited string, limit, offset int) ([]models.Article, int64, error)
-	//Feed(userID uint, limit, offset int) ([]models.Article, int64, error)
+	Feed(userID uint, limit, offset int) ([]models.Article, int64, error)
 }
 
 type ArticleRepositoryImpl struct{}
@@ -62,4 +62,39 @@ func (r *ArticleRepositoryImpl) List(tag, author, favorited string, limit, offse
 
 	err := query.Find(&articles).Error
 	return articles, totalCount, err
+}
+
+func (r *ArticleRepositoryImpl) Feed(userID uint, limit, offset int) ([]models.Article, int64, error) {
+	var followees []uint
+	if err := database.DB.Model(&models.Follow{}).Where("follower_id = ?", userID).Pluck("followee_id", &followees).Error; err != nil {
+		return nil, 0, err
+	}
+	if len(followees) == 0 {
+		return []models.Article{}, 0, nil
+	}
+
+	var articles []models.Article
+	query := database.DB.Preload("Author").Preload("Favorites").Where("author_id IN ?", followees)
+	var totalCount int64
+	query.Model(&models.Article{}).Count(&totalCount)
+	err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&articles).Error
+	return articles, totalCount, err
+}
+
+func (r *ArticleRepositoryImpl) FindBySlug(slug string) (*models.Article, error) {
+	var article models.Article
+	err := database.DB.Preload("Author").Preload("Favorites").Where("slug = ?", slug).First(&article).Error
+	return &article, err
+}
+
+func (r *ArticleRepositoryImpl) Create(article *models.Article) error {
+	return database.DB.Create(article).Error
+}
+
+func (r *ArticleRepositoryImpl) Update(article *models.Article) error {
+	return database.DB.Save(article).Error
+}
+
+func (r *ArticleRepositoryImpl) DeleteByID(articleID uint) error {
+	return database.DB.Delete(&models.Article{}, articleID).Error
 }

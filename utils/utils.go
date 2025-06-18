@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"github.com/gosimple/slug"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -47,4 +48,8 @@ func ParseToken(tokenString string) (uint, error) {
 	}
 
 	return uint(userIDFloat), nil
+}
+
+func GenerateSlug(title string) string {
+	return slug.Make(title)
 }
